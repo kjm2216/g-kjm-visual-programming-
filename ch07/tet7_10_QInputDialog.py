@@ -1,0 +1,98 @@
+import sys
+from PySide6.QtWidgets import(
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QPushButton,
+    QLabel,
+    QVBoxLayout,
+    QLineEdit,
+    QInputDialog
+)
+
+class MW (QMainWindow):
+    def __init__(self):
+        super(MW, self).__init__()
+        self.init_ui()
+        self.show()
+        
+    def init_ui(self):
+        layout = QVBoxLayout()
+        tmp = QWidget()
+        tmp.setLayout(layout)
+        
+        self.l_buttons = ['getText',
+                          'getMultilineText',
+                          'getInt',
+                          'getDouble',
+                          'getItem']
+        for idx, c_str in enumerate(self.l_buttons):
+            button0 = QPushButton(c_str)
+            button0.clicked.connect(self.slot00)
+            layout.addWidget(button0)
+            
+        self.ret_label = QLabel()
+        layout.addWidget(self.ret_label)
+        
+        self.setCentralWidget(tmp)
+        
+    def slot00(self):
+        print(self.sender())
+        sender = self.sender()
+        
+        tmp_str = sender.text()
+        
+        is_ok = False
+        
+        if tmp_str == self.l_buttons[0]:
+            ret_val, is_ok = QInputDialog.getText(
+                self,
+                "Input Text",
+                "Enter Your Text!",
+                QLineEdit.PasswordEchoOnEdit,
+                "default text!",
+            )
+        elif tmp_str == self.l_buttons[1]:
+            ret_val, is_ok = QInputDialog.getMultiLineText(
+                self,
+                "Input Multi-Line Text",
+                "Enter your Multi-Line Text!!",
+                "default text!",
+            )
+        elif tmp_str == self.l_buttons[2]:
+            ret_val, is_ok = QInputDialog.getInt(
+                self,
+                "Input Integer",
+                "Enter your Int Value!!",
+                0,
+                0,100,
+                3,
+            )
+        elif tmp_str == self.l_buttons[3]:
+            ret_val, is_ok = QInputDialog.getDouble(
+                self,
+                "Input Double",
+                "Enter your Double Text!!",
+                0,
+                0.0, 100.0,
+                4,
+            )
+        elif tmp_str == self.l_buttons[4]:
+            ret_val, is_ok = QInputDialog.getItem(
+                self,
+                "Input Item",
+                "Enter your Double Value!!",
+                ["faith", "hope", "love"],
+                0,
+                True
+            )
+        if is_ok:
+            print(type(ret_val), type(is_ok))
+            self.ret_label.setText(f'{ret_val}')
+            
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    mw = MW()
+    sys.exit(app.exec())
+    
+    

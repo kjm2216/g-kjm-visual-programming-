@@ -3,12 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.image import imread
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
-    QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar
+    QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar
 )
+from PySide6.QtGui import QIcon, QAction
 
 class InteractivePlot(QMainWindow):
     def __init__(self):
@@ -28,19 +30,28 @@ class InteractivePlot(QMainWindow):
         load_action = file_menu.addAction("Load Image")
         load_action.triggered.connect(self.load_image_from_menu)
 
+        # 기본 NavigationToolbar 설정
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
+        # 커스텀 도구 모음 설정
+        self.custom_toolbar = QToolBar("Custom Toolbar")
+        self.addToolBar(Qt.TopToolBarArea, self.custom_toolbar)
+        self.add_toolbar_actions()
+
         # 메인 레이아웃 설정
         main_layout = QVBoxLayout()
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
+        main_layout.addWidget(self.toolbar)
+        main_layout.addWidget(self.canvas)
+
         # 그래프 영역 설정
-        self.figure = Figure()
-        self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         self.ax.axis('off')  # 축을 초기에 비활성화하여 이미지만 표시
-
-        main_layout.addWidget(self.canvas)
 
         # 마우스 드래그 상태 및 사각형 선택을 위한 변수 초기화
         self.dragging = False
@@ -53,6 +64,17 @@ class InteractivePlot(QMainWindow):
         self.canvas.mpl_connect('button_press_event', self.on_click)
         self.canvas.mpl_connect('motion_notify_event', self.on_drag)
         self.canvas.mpl_connect('button_release_event', self.on_release)
+
+    def add_toolbar_actions(self):
+        # Load Image
+        load_action = QAction(QIcon('icons/open.png'), 'Load Image', self)
+        load_action.triggered.connect(self.load_image_from_menu)
+        self.custom_toolbar.addAction(load_action)
+
+        # Save Image
+        save_action = QAction(QIcon('icons/save.png'), 'Save Image', self)
+        save_action.triggered.connect(self.save_image)
+        self.custom_toolbar.addAction(save_action)
 
     def load_image_from_menu(self):
         file_name, _ = QFileDialog.getOpenFileName(self, 
@@ -73,8 +95,20 @@ class InteractivePlot(QMainWindow):
         self.canvas.draw()
         self.statusBar.showMessage(f"Loaded image: {file_name}")
 
-    def on_click(self, event):
+    def save_image(self):
         if self.image is None:
+            QMessageBox.warning(self, "No Image", "No image to save.")
+            return
+        file_name, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "PNG Files (*.png);;JPG Files (*.jpg);;BMP Files (*.bmp)")
+        if file_name:
+            plt.imsave(file_name, self.image)
+            self.statusBar.showMessage(f"Saved image: {file_name}")
+
+    def is_navigation_active(self):
+        return self.toolbar.mode != ''
+
+    def on_click(self, event):
+        if self.image is None or self.is_navigation_active():
             return
         if event.button == 3:
             self.on_right_click(event)
@@ -89,7 +123,7 @@ class InteractivePlot(QMainWindow):
             self.canvas.draw()
 
     def on_right_click(self, event):
-        if self.image is None:
+        if self.image is None or self.is_navigation_active():
             return
         if event.dblclick:
             self.ax.add_patch(
@@ -98,7 +132,7 @@ class InteractivePlot(QMainWindow):
             self.canvas.draw()
 
     def on_drag(self, event):
-        if self.image is None:
+        if self.image is None or self.is_navigation_active():
             return
         if not self.dragging or not event.inaxes:
             return
@@ -112,7 +146,7 @@ class InteractivePlot(QMainWindow):
         self.canvas.draw()
 
     def on_release(self, event):
-        if self.image is None:
+        if self.image is None or self.is_navigation_active():
             return
         if event.button == 3:
             return

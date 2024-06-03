@@ -7,9 +7,22 @@ from matplotlib.image import imread
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit
+    QApplication, QMainWindow, 
+    QVBoxLayout, QHBoxLayout, 
+    QWidget, 
+    QFileDialog, QMessageBox, QMenuBar, 
+    QStatusBar, QToolBar, QTextEdit
 )
 from PySide6.QtGui import QIcon, QAction, QKeySequence
+
+class CustomNavigationToolbar(NavigationToolbar):
+    def __init__(self, canvas, parent):
+        super().__init__(canvas, parent)
+        self.add_line_action = QAction("Draw Line", self)
+        self.add_line_action.setCheckable(True)
+        self.add_line_action.triggered.connect(parent.toggle_line_mode)
+        self.addAction(self.add_line_action)
+        self.addSeparator()
 
 class InteractivePlot(QMainWindow):
     def __init__(self):
@@ -17,6 +30,8 @@ class InteractivePlot(QMainWindow):
 
         self.setWindowTitle("Interactive Image Editor")
         self.resize(1000, 600)
+
+        self.line_mode_active = False
 
         # 상태 표시줄 설정
         self.statusBar = QStatusBar()
@@ -39,7 +54,7 @@ class InteractivePlot(QMainWindow):
         # 기본 NavigationToolbar 설정
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.toolbar = CustomNavigationToolbar(self.canvas, self)
 
         # 커스텀 도구 모음 설정
         self.custom_toolbar = QToolBar("Custom Toolbar")
@@ -71,6 +86,7 @@ class InteractivePlot(QMainWindow):
         # 마우스 드래그 상태 및 사각형 선택을 위한 변수 초기화
         self.dragging = False
         self.rect = None
+        self.line = None
         self.start_point = (0, 0)
         self.image = None
 
@@ -80,8 +96,17 @@ class InteractivePlot(QMainWindow):
         self.canvas.mpl_connect('button_release_event', self.on_release)
 
     def add_toolbar_actions(self):
-        # 여기에 추가적인 도구 모음 액션을 넣을 수 있습니다.
-        pass
+        self.draw_line_action = QAction("Draw Line", self)
+        self.draw_line_action.setCheckable(True)
+        self.draw_line_action.triggered.connect(self.toggle_line_mode)
+        self.custom_toolbar.addAction(self.draw_line_action)
+
+    def toggle_line_mode(self):
+        self.line_mode_active = not self.line_mode_active
+        if self.line_mode_active:
+            self.statusBar.showMessage("Line drawing mode activated")
+        else:
+            self.statusBar.showMessage("Line drawing mode deactivated")
 
     def load_image_from_menu(self):
         file_name, _ = QFileDialog.getOpenFileName(self, 
@@ -119,6 +144,17 @@ class InteractivePlot(QMainWindow):
     def on_click(self, event):
         if self.image is None or self.is_navigation_active():
             return
+
+        if self.line_mode_active:
+            if event.inaxes != self.ax:
+                return
+            self.dragging = True
+            self.start_point = (event.xdata, event.ydata)
+            self.line = self.ax.add_line(plt.Line2D([event.xdata, event.xdata], [event.ydata, event.ydata], color='green'))
+            self.log_text.append(f"Started line : ({event.xdata:.2f}, {event.ydata:.2f})")
+            self.canvas.draw()
+            return
+
         if event.button == 3:
             self.on_right_click(event)
         else:
@@ -138,7 +174,7 @@ class InteractivePlot(QMainWindow):
             self.ax.add_patch(
                 plt.Circle((event.xdata, event.ydata), 10, color='blue', fill=True)
             )
-            self.log_text.append(f"Drew circle : ({event.xdata:.2f}, {event.ydata:.2f}) \nradius : 10" )
+            self.log_text.append(f"Drew circle at ({event.xdata:.2f}, {event.ydata:.2f}) with radius 10")
             self.canvas.draw()
 
     def on_drag(self, event):
@@ -148,6 +184,14 @@ class InteractivePlot(QMainWindow):
             return
         if event.dblclick:
             return 
+
+        if self.line_mode_active:
+            x0, y0 = self.start_point
+            x1, y1 = event.xdata, event.ydata
+            self.line.set_data([x0, x1], [y0, y1])
+            self.canvas.draw()
+            return
+
         x0, y0 = self.start_point
         x1, y1 = event.xdata, event.ydata
         self.rect.set_width(x1 - x0)
@@ -159,6 +203,14 @@ class InteractivePlot(QMainWindow):
         if self.image is None or self.is_navigation_active():
             return
         if event.button == 3:
+            return
+        if self.line_mode_active:
+            if self.dragging:
+                self.dragging = False
+                x0, y0 = self.start_point
+                x1, y1 = event.xdata, event.ydata
+                self.log_text.append(f"Drew line : ({x1:.2f}, {y1:.2f})")
+                self.canvas.draw()
             return
         if self.dragging:
             self.dragging = False
@@ -174,7 +226,9 @@ class InteractivePlot(QMainWindow):
                 self.rect.remove()
                 self.log_text.append("Rectangle removed")
             else:
-                self.log_text.append(f"Rectangle kept : ({min(x0, x1):.2f}, {min(y0, y1):.2f}) \nwidth : {width:.2f} height : {height:.2f}")
+                self.log_text.append(f"Rectangle kept : ({min(x0, x1):.2f}, {min(y0, y1):.2f})\n"
+                                     f"Width : {width:.2f}\n"
+                                     f"Height : {height:.2f}")
             self.canvas.draw()
 
 if __name__ == "__main__":

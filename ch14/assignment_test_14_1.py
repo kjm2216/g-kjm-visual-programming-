@@ -7,11 +7,7 @@ from matplotlib.image import imread
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, 
-    QVBoxLayout, QHBoxLayout, 
-    QWidget, 
-    QFileDialog, QMessageBox, QMenuBar, 
-    QStatusBar, QToolBar, QTextEdit
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit
 )
 from PySide6.QtGui import QIcon, QAction, QKeySequence
 
@@ -22,6 +18,12 @@ class CustomNavigationToolbar(NavigationToolbar):
         self.add_line_action.setCheckable(True)
         self.add_line_action.triggered.connect(parent.toggle_line_mode)
         self.addAction(self.add_line_action)
+
+        self.add_pencil_action = QAction("Draw Pencil", self)
+        self.add_pencil_action.setCheckable(True)
+        self.add_pencil_action.triggered.connect(parent.toggle_pencil_mode)
+        self.addAction(self.add_pencil_action)
+
         self.addSeparator()
 
 class InteractivePlot(QMainWindow):
@@ -32,6 +34,7 @@ class InteractivePlot(QMainWindow):
         self.resize(1000, 600)
 
         self.line_mode_active = False
+        self.pencil_mode_active = False
 
         # 상태 표시줄 설정
         self.statusBar = QStatusBar()
@@ -87,6 +90,7 @@ class InteractivePlot(QMainWindow):
         self.dragging = False
         self.rect = None
         self.line = None
+        self.pencil_path = []
         self.start_point = (0, 0)
         self.image = None
 
@@ -101,12 +105,28 @@ class InteractivePlot(QMainWindow):
         self.draw_line_action.triggered.connect(self.toggle_line_mode)
         self.custom_toolbar.addAction(self.draw_line_action)
 
+        self.draw_pencil_action = QAction("Draw Pencil", self)
+        self.draw_pencil_action.setCheckable(True)
+        self.draw_pencil_action.triggered.connect(self.toggle_pencil_mode)
+        self.custom_toolbar.addAction(self.draw_pencil_action)
+
     def toggle_line_mode(self):
         self.line_mode_active = not self.line_mode_active
         if self.line_mode_active:
+            self.pencil_mode_active = False
+            self.draw_pencil_action.setChecked(False)
             self.statusBar.showMessage("Line drawing mode activated")
         else:
             self.statusBar.showMessage("Line drawing mode deactivated")
+
+    def toggle_pencil_mode(self):
+        self.pencil_mode_active = not self.pencil_mode_active
+        if self.pencil_mode_active:
+            self.line_mode_active = False
+            self.draw_line_action.setChecked(False)
+            self.statusBar.showMessage("Pencil drawing mode activated")
+        else:
+            self.statusBar.showMessage("Pencil drawing mode deactivated")
 
     def load_image_from_menu(self):
         file_name, _ = QFileDialog.getOpenFileName(self, 
@@ -151,8 +171,16 @@ class InteractivePlot(QMainWindow):
             self.dragging = True
             self.start_point = (event.xdata, event.ydata)
             self.line = self.ax.add_line(plt.Line2D([event.xdata, event.xdata], [event.ydata, event.ydata], color='green'))
-            self.log_text.append(f"Started line : ({event.xdata:.2f}, {event.ydata:.2f})")
+            self.log_text.append(f"Started line at ({event.xdata:.2f}, {event.ydata:.2f})")
             self.canvas.draw()
+            return
+
+        if self.pencil_mode_active:
+            if event.inaxes != self.ax:
+                return
+            self.dragging = True
+            self.pencil_path = [(event.xdata, event.ydata)]
+            self.log_text.append(f"Started drawing at ({event.xdata:.2f}, {event.ydata:.2f})")
             return
 
         if event.button == 3:
@@ -192,6 +220,13 @@ class InteractivePlot(QMainWindow):
             self.canvas.draw()
             return
 
+        if self.pencil_mode_active:
+            self.pencil_path.append((event.xdata, event.ydata))
+            path_x, path_y = zip(*self.pencil_path)
+            self.ax.plot(path_x, path_y, color='black')
+            self.canvas.draw()
+            return
+
         x0, y0 = self.start_point
         x1, y1 = event.xdata, event.ydata
         self.rect.set_width(x1 - x0)
@@ -209,9 +244,17 @@ class InteractivePlot(QMainWindow):
                 self.dragging = False
                 x0, y0 = self.start_point
                 x1, y1 = event.xdata, event.ydata
-                self.log_text.append(f"Drew line : ({x1:.2f}, {y1:.2f})")
+                self.log_text.append(f"Drew line to ({x1:.2f}, {y1:.2f})")
                 self.canvas.draw()
             return
+
+        if self.pencil_mode_active:
+            if self.dragging:
+                self.dragging = False
+                self.log_text.append(f"Finished drawing")
+                self.canvas.draw()
+            return
+
         if self.dragging:
             self.dragging = False
             x0, y0 = self.start_point
@@ -226,7 +269,7 @@ class InteractivePlot(QMainWindow):
                 self.rect.remove()
                 self.log_text.append("Rectangle removed")
             else:
-                self.log_text.append(f"Rectangle kept : ({min(x0, x1):.2f}, {min(y0, y1):.2f})\n"
+                self.log_text.append(f"Rectangle kept at ({min(x0, x1):.2f}, {min(y0, y1):.2f})\n"
                                      f"Width : {width:.2f}\n"
                                      f"Height : {height:.2f}")
             self.canvas.draw()

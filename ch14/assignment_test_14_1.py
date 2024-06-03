@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar
 )
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtGui import QIcon, QAction, QKeySequence
 
 class InteractivePlot(QMainWindow):
     def __init__(self):
@@ -27,8 +27,15 @@ class InteractivePlot(QMainWindow):
         self.menuBar = QMenuBar(self)
         self.setMenuBar(self.menuBar)
         file_menu = self.menuBar.addMenu("File")
-        load_action = file_menu.addAction("Load Image")
+
+        load_action = QAction("Load Image", self)
         load_action.triggered.connect(self.load_image_from_menu)
+        file_menu.addAction(load_action)
+
+        save_action = QAction("Save Image", self)
+        save_action.setShortcut(QKeySequence.Save)  # Ctrl+S 단축키 설정
+        save_action.triggered.connect(self.save_image)
+        file_menu.addAction(save_action)
 
         # 기본 NavigationToolbar 설정
         self.figure = Figure()
@@ -66,15 +73,8 @@ class InteractivePlot(QMainWindow):
         self.canvas.mpl_connect('button_release_event', self.on_release)
 
     def add_toolbar_actions(self):
-        # Load Image
-        load_action = QAction(QIcon('icons/open.png'), 'Load Image', self)
-        load_action.triggered.connect(self.load_image_from_menu)
-        self.custom_toolbar.addAction(load_action)
-
-        # Save Image
-        save_action = QAction(QIcon('icons/save.png'), 'Save Image', self)
-        save_action.triggered.connect(self.save_image)
-        self.custom_toolbar.addAction(save_action)
+        # 여기에 추가적인 도구 모음 액션을 넣을 수 있습니다.
+        pass
 
     def load_image_from_menu(self):
         file_name, _ = QFileDialog.getOpenFileName(self, 
@@ -101,7 +101,7 @@ class InteractivePlot(QMainWindow):
             return
         file_name, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "PNG Files (*.png);;JPG Files (*.jpg);;BMP Files (*.bmp)")
         if file_name:
-            plt.imsave(file_name, self.image)
+            self.figure.savefig(file_name)
             self.statusBar.showMessage(f"Saved image: {file_name}")
 
     def is_navigation_active(self):

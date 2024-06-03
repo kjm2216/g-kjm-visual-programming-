@@ -1,5 +1,4 @@
 import sys
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -8,7 +7,7 @@ from matplotlib.image import imread
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit
 )
 from PySide6.QtGui import QIcon, QAction, QKeySequence
 
@@ -17,7 +16,7 @@ class InteractivePlot(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Interactive Image Editor")
-        self.resize(800, 600)
+        self.resize(1000, 600)
 
         # 상태 표시줄 설정
         self.statusBar = QStatusBar()
@@ -48,13 +47,22 @@ class InteractivePlot(QMainWindow):
         self.add_toolbar_actions()
 
         # 메인 레이아웃 설정
-        main_layout = QVBoxLayout()
+        main_layout = QHBoxLayout()
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
-        main_layout.addWidget(self.toolbar)
-        main_layout.addWidget(self.canvas)
+        # 그래프와 로그 레이아웃 설정
+        plot_layout = QVBoxLayout()
+        main_layout.addLayout(plot_layout)
+
+        plot_layout.addWidget(self.toolbar)
+        plot_layout.addWidget(self.canvas)
+
+        # 로그 창 설정
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        main_layout.addWidget(self.log_text)
 
         # 그래프 영역 설정
         self.ax = self.figure.add_subplot(111)
@@ -64,7 +72,6 @@ class InteractivePlot(QMainWindow):
         self.dragging = False
         self.rect = None
         self.start_point = (0, 0)
-        self.click_count = 0  # 클릭 횟수 카운트를 위한 변수
         self.image = None
 
         # 마우스 클릭 및 더블클릭 이벤트 연결
@@ -94,6 +101,7 @@ class InteractivePlot(QMainWindow):
         self.ax.axis('on')
         self.canvas.draw()
         self.statusBar.showMessage(f"Loaded image: {file_name}")
+        self.log_text.append(f"Loaded image: {file_name}")
 
     def save_image(self):
         if self.image is None:
@@ -103,6 +111,7 @@ class InteractivePlot(QMainWindow):
         if file_name:
             self.figure.savefig(file_name)
             self.statusBar.showMessage(f"Saved image: {file_name}")
+            self.log_text.append(f"Saved image: {file_name}")
 
     def is_navigation_active(self):
         return self.toolbar.mode != ''
@@ -129,6 +138,7 @@ class InteractivePlot(QMainWindow):
             self.ax.add_patch(
                 plt.Circle((event.xdata, event.ydata), 10, color='blue', fill=True)
             )
+            self.log_text.append(f"Drew circle : ({event.xdata:.2f}, {event.ydata:.2f}) \nradius : 10" )
             self.canvas.draw()
 
     def on_drag(self, event):
@@ -152,12 +162,19 @@ class InteractivePlot(QMainWindow):
             return
         if self.dragging:
             self.dragging = False
+            x0, y0 = self.start_point
+            x1, y1 = event.xdata, event.ydata
+            width = abs(x1 - x0)
+            height = abs(y1 - y0)
             response = QMessageBox.question(self, 
                                             "Confirm", 
                                             "Keep the rectangle?", 
                                             QMessageBox.Yes | QMessageBox.No)
             if response == QMessageBox.No:
                 self.rect.remove()
+                self.log_text.append("Rectangle removed")
+            else:
+                self.log_text.append(f"Rectangle kept : ({min(x0, x1):.2f}, {min(y0, y1):.2f}) \nwidth : {width:.2f} height : {height:.2f}")
             self.canvas.draw()
 
 if __name__ == "__main__":

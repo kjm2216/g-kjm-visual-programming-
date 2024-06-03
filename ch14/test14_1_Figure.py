@@ -53,10 +53,10 @@ class MainWindow(QMainWindow):
         print('------------------------\n')
 
     # 마우스가 움직였을 때 호출되는 메소드
-    # def on_motion(self, event):
-    #     if event.xdata is not None and event.ydata is not None:  # 마우스 위치가 유효한 경우
-    #         print(f"Mouse moved to ({event.xdata:.2f}, {event.ydata:.2f})")
-    #         print('------------------------')
+    def on_motion(self, event):
+        if event.xdata is not None and event.ydata is not None:  # 마우스 위치가 유효한 경우
+            print(f"Mouse moved to ({event.xdata:.2f}, {event.ydata:.2f})")
+            print('------------------------')
 
     # 키보드 키가 눌렸을 때 호출되는 메소드
     def on_key_press(self, event):

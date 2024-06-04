@@ -5,12 +5,9 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 
-# MainWindow 클래스는 PySide6의 QMainWindow를 상속받아 사용자 정의 윈도우를 생성.
 class MainWindow(QMainWindow):
     def __init__(self):
-        # 부모 클래스의 생성자 호출
         super().__init__()  
-        # 윈도우 제목 설정
         self.setWindowTitle("Event Handling with Matplotlib and PySide6")  
 
         # Matplotlib Figure 객체 생성. 이 객체는 플롯의 컨테이너 역할을 수행.
@@ -70,7 +67,7 @@ class MainWindow(QMainWindow):
 
 # 애플리케이션 실행 부분
 if __name__ == "__main__":
-    app = QApplication(sys.argv)  # 애플리케이션 인스턴스 생성
-    main_window = MainWindow()    # MainWindow 인스턴스 생성
-    main_window.show()            # 메인 윈도우 표시
-    sys.exit(app.exec())          # 애플리케이션 이벤트 루프 시작
+    app = QApplication(sys.argv)  
+    main_window = MainWindow()    
+    main_window.show()           
+    sys.exit(app.exec())          

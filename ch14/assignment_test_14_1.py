@@ -1,4 +1,5 @@
 import sys
+import os
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -7,9 +8,7 @@ from matplotlib.image import imread
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, 
-    QVBoxLayout, QHBoxLayout, QWidget, 
-    QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit, QListWidget, QListWidgetItem
 )
 from PySide6.QtGui import QIcon, QAction, QKeySequence
 
@@ -28,12 +27,12 @@ class CustomNavigationToolbar(NavigationToolbar):
 
         self.addSeparator()
 
-class ImageMW(QMainWindow):
+class InteractivePlot(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Interactive Image Editor")
-        self.resize(1000, 600)
+        self.resize(900, 700)
 
         self.line_mode_active = False
         self.pencil_mode_active = False
@@ -56,15 +55,14 @@ class ImageMW(QMainWindow):
         save_action.triggered.connect(self.save_image)
         file_menu.addAction(save_action)
 
+        dir_action = QAction("Open Directory", self)
+        dir_action.triggered.connect(self.open_directory)
+        file_menu.addAction(dir_action)
+
         # 기본 NavigationToolbar 설정
         self.figure = Figure()
         self.canvas = FigureCanvas(self.figure)
         self.toolbar = CustomNavigationToolbar(self.canvas, self)
-
-        # 커스텀 도구 모음 설정
-        self.custom_toolbar = QToolBar("Custom Toolbar")
-        self.addToolBar(Qt.TopToolBarArea, self.custom_toolbar)
-        self.add_toolbar_actions()
 
         # 메인 레이아웃 설정
         main_layout = QHBoxLayout()
@@ -72,17 +70,22 @@ class ImageMW(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
-        # 그래프와 로그 레이아웃 설정
-        plot_layout = QVBoxLayout()
-        main_layout.addLayout(plot_layout)
+        # 왼쪽 레이아웃 설정 (파일 리스트)
+        self.list_widget = QListWidget()
+        self.list_widget.itemClicked.connect(self.on_item_clicked)
+        main_layout.addWidget(self.list_widget)
 
-        plot_layout.addWidget(self.toolbar)
-        plot_layout.addWidget(self.canvas)
+        # 그래프와 로그 레이아웃 설정 (오른쪽)
+        right_layout = QVBoxLayout()
+        main_layout.addLayout(right_layout)
+
+        right_layout.addWidget(self.toolbar)
+        right_layout.addWidget(self.canvas)
 
         # 로그 창 설정
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        main_layout.addWidget(self.log_text)
+        right_layout.addWidget(self.log_text)
 
         # 그래프 영역 설정
         self.ax = self.figure.add_subplot(111)
@@ -101,22 +104,11 @@ class ImageMW(QMainWindow):
         self.canvas.mpl_connect('motion_notify_event', self.on_drag)
         self.canvas.mpl_connect('button_release_event', self.on_release)
 
-    def add_toolbar_actions(self):
-        self.draw_line_action = QAction("Draw Line", self)
-        self.draw_line_action.setCheckable(True)
-        self.draw_line_action.triggered.connect(self.toggle_line_mode)
-        self.custom_toolbar.addAction(self.draw_line_action)
-
-        self.draw_pencil_action = QAction("Draw Pencil", self)
-        self.draw_pencil_action.setCheckable(True)
-        self.draw_pencil_action.triggered.connect(self.toggle_pencil_mode)
-        self.custom_toolbar.addAction(self.draw_pencil_action)
-
     def toggle_line_mode(self):
         self.line_mode_active = not self.line_mode_active
         if self.line_mode_active:
             self.pencil_mode_active = False
-            self.draw_pencil_action.setChecked(False)
+            self.toolbar.add_pencil_action.setChecked(False)
             self.statusBar.showMessage("Line drawing mode activated")
         else:
             self.statusBar.showMessage("Line drawing mode deactivated")
@@ -125,7 +117,7 @@ class ImageMW(QMainWindow):
         self.pencil_mode_active = not self.pencil_mode_active
         if self.pencil_mode_active:
             self.line_mode_active = False
-            self.draw_line_action.setChecked(False)
+            self.toolbar.add_line_action.setChecked(False)
             self.statusBar.showMessage("Pencil drawing mode activated")
         else:
             self.statusBar.showMessage("Pencil drawing mode deactivated")
@@ -137,6 +129,21 @@ class ImageMW(QMainWindow):
                                                    "Image Files (*.png *.jpg *.bmp)")
         if file_name:
             self.load_image(file_name)
+
+    def open_directory(self):
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        if directory:
+            self.list_widget.clear()
+            image_files = [f for f in os.listdir(directory) if f.lower().endswith(('.png', '.jpg', '.bmp'))]
+            for image_file in image_files:
+                item = QListWidgetItem(image_file)
+                item.setData(Qt.UserRole, os.path.join(directory, image_file))
+                self.list_widget.addItem(item)
+
+    def on_item_clicked(self, item):
+        file_path = item.data(Qt.UserRole)
+        self.load_image(file_path)
+        self.statusBar.showMessage(file_path)
 
     def load_image(self, file_name):
         if not file_name.lower().endswith(('.png', '.jpg', '.bmp')):
@@ -262,10 +269,10 @@ class ImageMW(QMainWindow):
             x0, y0 = self.start_point
             x1, y1 = event.xdata, event.ydata
             width = abs(x1 - x0)
-            height = abs(y1 - y0)
+            height = abs(y1 - y0)   
             response = QMessageBox.question(self, 
                                             "Confirm", 
-                                            "Keep the rectangle?", 
+                                         "Keep the rectangle?", 
                                             QMessageBox.Yes | QMessageBox.No)
             if response == QMessageBox.No:
                 self.rect.remove()
@@ -278,6 +285,6 @@ class ImageMW(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    mwd = ImageMW()
+    mwd = InteractivePlot()
     mwd.show()
     sys.exit(app.exec())

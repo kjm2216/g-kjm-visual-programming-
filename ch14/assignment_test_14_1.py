@@ -7,7 +7,9 @@ from matplotlib.image import imread
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit
+    QApplication, QMainWindow, 
+    QVBoxLayout, QHBoxLayout, QWidget, 
+    QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit
 )
 from PySide6.QtGui import QIcon, QAction, QKeySequence
 
@@ -26,7 +28,7 @@ class CustomNavigationToolbar(NavigationToolbar):
 
         self.addSeparator()
 
-class InteractivePlot(QMainWindow):
+class ImageMW(QMainWindow):
     def __init__(self):
         super().__init__()
 
@@ -276,6 +278,6 @@ class InteractivePlot(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    mwd = InteractivePlot()
+    mwd = ImageMW()
     mwd.show()
     sys.exit(app.exec())

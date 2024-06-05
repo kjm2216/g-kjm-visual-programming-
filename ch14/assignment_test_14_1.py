@@ -8,7 +8,7 @@ from matplotlib.image import imread
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit, QListWidget, QListWidgetItem
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QMessageBox, QMenuBar, QStatusBar, QToolBar, QTextEdit, QListWidget, QListWidgetItem, QPushButton
 )
 from PySide6.QtGui import QIcon, QAction, QKeySequence
 
@@ -104,6 +104,14 @@ class InteractivePlot(QMainWindow):
         self.canvas.mpl_connect('motion_notify_event', self.on_drag)
         self.canvas.mpl_connect('button_release_event', self.on_release)
 
+        # 그림 삭제 버튼 추가
+        self.clear_all_button = QPushButton("Clear All Shapes")
+        self.clear_all_button.clicked.connect(self.clear_all_shapes)
+        right_layout.addWidget(self.clear_all_button)
+
+        self.rectangles = []  # 사각형을 저장할 리스트
+        self.circles = []  # 원을 저장할 리스트
+
     def toggle_line_mode(self):
         self.line_mode_active = not self.line_mode_active
         if self.line_mode_active:
@@ -174,24 +182,6 @@ class InteractivePlot(QMainWindow):
         if self.image is None or self.is_navigation_active():
             return
 
-        if self.line_mode_active:
-            if event.inaxes != self.ax:
-                return
-            self.dragging = True
-            self.start_point = (event.xdata, event.ydata)
-            self.line = self.ax.add_line(plt.Line2D([event.xdata, event.xdata], [event.ydata, event.ydata], color='green'))
-            self.log_text.append(f"Started line at ({event.xdata:.2f}, {event.ydata:.2f})")
-            self.canvas.draw()
-            return
-
-        if self.pencil_mode_active:
-            if event.inaxes != self.ax:
-                return
-            self.dragging = True
-            self.pencil_path = [(event.xdata, event.ydata)]
-            self.log_text.append(f"Started drawing at ({event.xdata:.2f}, {event.ydata:.2f})")
-            return
-
         if event.button == 3:
             self.on_right_click(event)
         else:
@@ -199,18 +189,25 @@ class InteractivePlot(QMainWindow):
                 return
             self.dragging = True
             self.start_point = (event.xdata, event.ydata)
-            self.rect = self.ax.add_patch(
-                plt.Rectangle(self.start_point, 0, 0, fill=False, color='red')
-            )
-            self.canvas.draw()
+            if self.line_mode_active:
+                self.line = self.ax.add_line(plt.Line2D([event.xdata, event.xdata], [event.ydata, event.ydata], color='green'))
+                self.log_text.append(f"Started line at ({event.xdata:.2f}, {event.ydata:.2f})")
+            elif self.pencil_mode_active:
+                self.pencil_path = [(event.xdata, event.ydata)]
+                self.log_text.append(f"Started drawing at ({event.xdata:.2f}, {event.ydata:.2f})")
+            else:
+                self.rect = plt.Rectangle(self.start_point, 0, 0, fill=False, color='red')
+                self.ax.add_patch(self.rect)
+                self.rectangles.append(self.rect)  # 사각형 객체를 리스트에 추가
+                self.canvas.draw()
 
     def on_right_click(self, event):
         if self.image is None or self.is_navigation_active():
             return
         if event.dblclick:
-            self.ax.add_patch(
-                plt.Circle((event.xdata, event.ydata), 10, color='blue', fill=True)
-            )
+            circle = plt.Circle((event.xdata, event.ydata), 10, color='blue', fill=True)
+            self.ax.add_patch(circle)
+            self.circles.append(circle)  # 원 객체를 리스트에 추가
             self.log_text.append(f"Drew circle at ({event.xdata:.2f}, {event.ydata:.2f}) with radius 10")
             self.canvas.draw()
 
@@ -232,7 +229,7 @@ class InteractivePlot(QMainWindow):
         if self.pencil_mode_active:
             self.pencil_path.append((event.xdata, event.ydata))
             path_x, path_y = zip(*self.pencil_path)
-            self.ax.plot(path_x, path_y, color='black')
+            self.ax.plot(path_x, path_y, color='purple')
             self.canvas.draw()
             return
 
@@ -276,12 +273,31 @@ class InteractivePlot(QMainWindow):
                                             QMessageBox.Yes | QMessageBox.No)
             if response == QMessageBox.No:
                 self.rect.remove()
+                self.rectangles.remove(self.rect)  # 삭제된 객체를 리스트에서 제거
                 self.log_text.append("Rectangle removed")
             else:
                 self.log_text.append(f"Rectangle kept at ({min(x0, x1):.2f}, {min(y0, y1):.2f})\n"
                                      f"Width : {width:.2f}\n"
                                      f"Height : {height:.2f}")
             self.canvas.draw()
+
+    def clear_all_shapes(self):
+        if self.image is None or self.is_navigation_active():
+            return
+        for rect in self.rectangles:
+            rect.remove()  # 사각형 객체 제거
+        for circle in self.circles:
+            circle.remove()  # 원 객체 제거
+        self.rectangles = []  # 사각형 리스트 초기화
+        self.circles = []  # 원 리스트 초기화
+        
+        for artist in self.ax.artists:
+            artist.remove()
+        for line in self.ax.lines:
+            line.remove()
+        
+        self.log_text.append("Cleared all shapes")
+        self.canvas.draw()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
